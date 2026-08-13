@@ -31,6 +31,7 @@ export default function MePage() {
   const [counts, setCounts] = useState<PlayerCounts>({});
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [pinErr, setPinErr] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -74,10 +75,11 @@ export default function MePage() {
   }
 
   async function save() {
+    setErr(null); setPinErr(null);
     if (!name.trim()) { setErr("pick a name"); return; }
-    if (!PIN_RE.test(pin)) { setErr("PIN must be 4 digits"); return; }
-    if (isFirstClaim && pin !== pinConfirm) { setErr("PINs don't match"); return; }
-    setSaving(true); setErr(null);
+    if (!PIN_RE.test(pin)) { setPinErr("PIN must be 4 digits"); scrollToTop(); return; }
+    if (isFirstClaim && pin !== pinConfirm) { setPinErr("PINs don't match"); scrollToTop(); return; }
+    setSaving(true);
     try {
       const body: any = { name: name.trim(), counts };
       if (isFirstClaim) body.setPin = pin;
@@ -87,19 +89,36 @@ export default function MePage() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(body),
       });
-      const d = await r.json();
-      if (r.status === 429) throw new Error(`Too many attempts. Try again in ${d.retryAfterSec ?? 60}s.`);
-      if (r.status === 409) {
-        // Name was claimed by someone else between our check and save. Switch to verify mode.
-        setIsFirstClaim(false);
-        throw new Error("Name just claimed by someone else — enter their PIN or pick a different name.");
+      const d = await r.json().catch(() => ({}));
+      if (r.status === 429) {
+        setPinErr(`Too many attempts. Try again in ${d.retryAfterSec ?? 60}s.`);
+        scrollToTop();
+        return;
       }
-      if (!r.ok) throw new Error(d.error || "failed");
-      // Stash PIN for this browser.
+      if (r.status === 403) {
+        setPin("");
+        if (typeof window !== "undefined") localStorage.removeItem(pinKey(code, name.trim()));
+        setPinErr("Wrong PIN. Your cards are safe — re-enter the PIN and save again.");
+        scrollToTop();
+        return;
+      }
+      if (r.status === 409) {
+        setIsFirstClaim(false);
+        setPin("");
+        setPinErr("Name was just claimed. Enter its PIN, or pick another name.");
+        scrollToTop();
+        return;
+      }
+      if (!r.ok) { setErr(d.error || "failed"); return; }
       if (typeof window !== "undefined") localStorage.setItem(pinKey(code, name.trim()), pin);
       router.push(`/r/${code}`);
-    } catch (e: any) { setErr(String(e.message || e)); }
-    finally { setSaving(false); }
+    } catch (e: any) {
+      setErr(String(e.message || e));
+    } finally { setSaving(false); }
+  }
+
+  function scrollToTop() {
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   if (!room) return <p className="text-center opacity-60">Loading…</p>;
@@ -156,7 +175,7 @@ export default function MePage() {
               </label>
               <input
                 value={pin}
-                onChange={(e) => setPin(e.target.value.replace(/[^0-9]/g, "").slice(0, 4))}
+                onChange={(e) => { setPin(e.target.value.replace(/[^0-9]/g, "").slice(0, 4)); setPinErr(null); }}
                 placeholder="••••"
                 inputMode="numeric"
                 autoComplete="one-time-code"
@@ -165,14 +184,19 @@ export default function MePage() {
               {isFirstClaim && (
                 <input
                   value={pinConfirm}
-                  onChange={(e) => setPinConfirm(e.target.value.replace(/[^0-9]/g, "").slice(0, 4))}
+                  onChange={(e) => { setPinConfirm(e.target.value.replace(/[^0-9]/g, "").slice(0, 4)); setPinErr(null); }}
                   placeholder="Confirm PIN"
                   inputMode="numeric"
                   autoComplete="one-time-code"
                   className="input text-2xl font-mono tracking-widest text-center max-w-[10rem] mx-auto"
                 />
               )}
-              {!isFirstClaim && (
+              {pinErr && (
+                <p className="text-red-400 text-sm text-center bg-red-950/50 border border-red-900 rounded-md py-2 px-3">
+                  ⚠ {pinErr}
+                </p>
+              )}
+              {!isFirstClaim && !pinErr && (
                 <p className="text-xs text-zinc-500 text-center">Forgot your PIN? Ask the room admin to kick your slot so you can reclaim the name.</p>
               )}
             </div>
@@ -201,9 +225,12 @@ export default function MePage() {
             </section>
           ))}
 
-          <div className="sticky bottom-4 card p-3 flex items-center justify-between gap-3 border-clan-accent/40 shadow-lg backdrop-blur bg-clan-card/95">
-            <span className="text-sm text-zinc-400">Saving as <span className="text-clan-accent font-semibold">{name}</span></span>
-            <button disabled={saving || !PIN_RE.test(pin)} onClick={save} className="btn-primary">
+          <div className={`sticky bottom-4 card p-3 flex items-center justify-between gap-3 shadow-lg backdrop-blur bg-clan-card/95 ${pinErr ? "border-red-500" : "border-clan-accent/40"}`}>
+            <div className="min-w-0">
+              <div className="text-sm text-zinc-400 truncate">Saving as <span className="text-clan-accent font-semibold">{name}</span></div>
+              {pinErr && <div className="text-xs text-red-400 truncate">⚠ {pinErr}</div>}
+            </div>
+            <button disabled={saving || !PIN_RE.test(pin)} onClick={save} className="btn-primary flex-shrink-0">
               {saving ? "Saving…" : "Save"}
             </button>
           </div>
