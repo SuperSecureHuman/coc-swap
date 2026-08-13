@@ -64,7 +64,7 @@ export const CARDS: Card[] = [
   { number: 49, name: "Super Bowler", class: "Super Troop", icon: "/cards/49.png", gemCost: 110 },
 ];
 
-export const CLASSES: CardClass[] = ["Elixir", "Dark Elixir", "Super Troop", "Builder Base"];
+export const CLASSES: CardClass[] = ["Elixir", "Dark Elixir", "Builder Base", "Super Troop"];
 export const CARDS_BY_CLASS: Record<CardClass, Card[]> = CLASSES.reduce((a, cls) => { a[cls] = CARDS.filter(c => c.class === cls); return a; }, {} as any);
 export const CARD_BY_NUM: Record<number, Card> = Object.fromEntries(CARDS.map(c => [c.number, c]));
 
@@ -73,17 +73,8 @@ export function tierClass(card: Pick<Card, "gemCost">): string {
   return `tier-${card.gemCost}`;
 }
 
-// Reorder cards for the /me picker: swap the last two rows of each class.
-// Matches the actual in-game Clash of Cards layout, which reverses the tail
-// rows relative to card number order.
-export function reorderForPicker(cards: Card[], cols: number): Card[] {
-  if (cards.length <= cols) return cards.slice();
-  const fullTail = cards.length % cols === 0 ? cols : cards.length % cols;
-  const lastRowStart = cards.length - fullTail;
-  const secondLastRowStart = Math.max(0, lastRowStart - cols);
-  if (secondLastRowStart >= lastRowStart) return cards.slice();
-  const head = cards.slice(0, secondLastRowStart);
-  const secondLast = cards.slice(secondLastRowStart, lastRowStart);
-  const last = cards.slice(lastRowStart);
-  return [...head, ...last, ...secondLast];
+// Picker order = catalog order (card number). Matches in-game Clash of Cards
+// grid. `cols` kept in signature for call-site stability.
+export function reorderForPicker(cards: Card[], _cols: number): Card[] {
+  return cards.slice();
 }
