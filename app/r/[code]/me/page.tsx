@@ -177,6 +177,7 @@ export default function MePage() {
                 value={pin}
                 onChange={(e) => { setPin(e.target.value.replace(/[^0-9]/g, "").slice(0, 4)); setPinErr(null); }}
                 placeholder="••••"
+                type="password"
                 inputMode="numeric"
                 autoComplete="one-time-code"
                 className="input text-2xl font-mono tracking-widest text-center max-w-[10rem] mx-auto"
@@ -186,6 +187,7 @@ export default function MePage() {
                   value={pinConfirm}
                   onChange={(e) => { setPinConfirm(e.target.value.replace(/[^0-9]/g, "").slice(0, 4)); setPinErr(null); }}
                   placeholder="Confirm PIN"
+                  type="password"
                   inputMode="numeric"
                   autoComplete="one-time-code"
                   className="input text-2xl font-mono tracking-widest text-center max-w-[10rem] mx-auto"

@@ -219,7 +219,9 @@ function AdminPinModal({ onCancel, onSubmit }: { onCancel: () => void; onSubmit:
           value={pin}
           onChange={(e) => setPin(e.target.value.replace(/[^0-9]/g, "").slice(0, 4))}
           placeholder="••••"
+          type="password"
           inputMode="numeric"
+          autoComplete="one-time-code"
           autoFocus
           className="input text-2xl font-mono tracking-widest text-center"
         />
