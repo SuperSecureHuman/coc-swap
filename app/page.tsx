@@ -34,49 +34,57 @@ export default function Home() {
   }
 
   return (
-    <main className="space-y-8">
-      <header className="text-center py-6">
-        <h1 className="text-3xl sm:text-4xl font-bold text-clan-accent">Clan Swap</h1>
-        <p className="opacity-70 mt-2">Trade planner for Clash of Cards.</p>
+    <main className="space-y-10 animate-fade-in">
+      <header className="text-center py-8">
+        <h1 className="text-4xl sm:text-5xl font-bold text-clan-accent tracking-tight">Clan Swap</h1>
+        <p className="text-zinc-400 mt-3 text-sm">Trade planner for Clash of Cards.</p>
       </header>
 
       {created ? (
-        <section className="bg-clan-card rounded-xl p-6 space-y-3 border border-clan-accent/40">
-          <h2 className="text-xl font-semibold text-clan-accent">Room created!</h2>
-          <p>Share this code with your clan:</p>
-          <div className="text-3xl font-mono font-bold tracking-widest text-clan-accent bg-black/40 rounded p-3 text-center">{created.code}</div>
-          <p>Admin PIN (save it — only shown once):</p>
-          <div className="text-2xl font-mono font-bold tracking-widest bg-black/40 rounded p-3 text-center">{created.adminPin}</div>
-          <button className="w-full bg-clan-accent text-black font-bold rounded py-3 mt-2" onClick={() => router.push(`/r/${created.code}`)}>
+        <section className="card p-6 space-y-4 border-clan-accent/40 animate-fade-up max-w-lg mx-auto">
+          <h2 className="text-xl font-semibold text-clan-accent">Room created</h2>
+          <div>
+            <p className="text-xs uppercase tracking-widest text-zinc-500 mb-1">Share code</p>
+            <div className="text-3xl font-mono font-bold tracking-widest text-clan-accent bg-zinc-950 rounded-md p-3 text-center border border-zinc-800">
+              {created.code}
+            </div>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-widest text-zinc-500 mb-1">Admin PIN — save it, shown once</p>
+            <div className="text-2xl font-mono font-bold tracking-widest bg-zinc-950 rounded-md p-3 text-center border border-zinc-800">
+              {created.adminPin}
+            </div>
+          </div>
+          <button className="btn-primary w-full" onClick={() => router.push(`/r/${created.code}`)}>
             Enter room →
           </button>
         </section>
       ) : (
-        <section className="grid gap-6 sm:grid-cols-2">
-          <div className="bg-clan-card rounded-xl p-6 space-y-3 border border-white/5">
+        <section className="grid gap-6 sm:grid-cols-2 max-w-3xl mx-auto">
+          <div className="card p-6 space-y-4 animate-fade-up">
             <h2 className="text-xl font-semibold">Create a room</h2>
-            <p className="opacity-70 text-sm">Get a shareable code + admin PIN.</p>
-            <button disabled={busy} onClick={create} className="w-full bg-clan-accent text-black font-bold rounded py-3 disabled:opacity-50">
+            <p className="text-zinc-400 text-sm">Get a shareable code and an admin PIN.</p>
+            <button disabled={busy} onClick={create} className="btn-primary w-full">
               {busy ? "Working…" : "Create room"}
             </button>
           </div>
-          <div className="bg-clan-card rounded-xl p-6 space-y-3 border border-white/5">
+          <div className="card p-6 space-y-4 animate-fade-up">
             <h2 className="text-xl font-semibold">Join a room</h2>
             <input
               value={joinCode}
               onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
               placeholder="ABC123"
               maxLength={8}
-              className="w-full bg-black/40 rounded p-3 text-xl font-mono tracking-widest text-center outline-none border border-white/10 focus:border-clan-accent"
+              className="input text-xl font-mono tracking-widest text-center"
             />
-            <button disabled={busy || !joinCode.trim()} onClick={join} className="w-full bg-clan-accent text-black font-bold rounded py-3 disabled:opacity-50">
+            <button disabled={busy || !joinCode.trim()} onClick={join} className="btn-primary w-full">
               {busy ? "Joining…" : "Join"}
             </button>
           </div>
         </section>
       )}
-      {err && <p className="text-red-400 text-center">{err}</p>}
-      <footer className="text-center opacity-40 text-xs pt-8">Ephemeral · rooms auto-expire in 30 days.</footer>
+      {err && <p className="text-red-400 text-center text-sm">{err}</p>}
+      <footer className="text-center text-zinc-500 text-xs pt-8">Ephemeral · rooms auto-expire in 90 days.</footer>
     </main>
   );
 }

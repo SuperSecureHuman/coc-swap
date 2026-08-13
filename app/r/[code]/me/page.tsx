@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { CARDS_BY_CLASS, CLASSES } from "@/lib/catalog";
+import { CARDS_BY_CLASS, CLASSES, reorderForPicker, tierClass } from "@/lib/catalog";
 import type { PlayerCounts } from "@/lib/types";
 
 type RoomState = {
@@ -70,50 +70,50 @@ export default function MePage() {
   const existingNames = Object.keys(room.players);
 
   return (
-    <main className="space-y-6">
+    <main className="space-y-6 animate-fade-in">
       <nav className="flex items-center justify-between">
-        <button onClick={() => router.push(`/r/${code}`)} className="opacity-60 hover:opacity-100">← Room</button>
-        <span className="font-mono text-clan-accent">{code}</span>
+        <button onClick={() => router.push(`/r/${code}`)} className="btn-ghost text-sm">← Room</button>
+        <span className="font-mono text-clan-accent tracking-widest">{code}</span>
       </nav>
 
-      <section className="bg-clan-card rounded-xl p-4 space-y-3">
+      <section className="card p-5 space-y-3">
         <h2 className="text-lg font-semibold">Who are you?</h2>
         {!nameLocked ? (
           <div className="space-y-3">
             {existingNames.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {existingNames.map((n) => (
-                  <button key={n} onClick={() => { setName(n); setNameLocked(true); }} className="px-3 py-2 rounded bg-black/40 hover:bg-clan-accent hover:text-black">
+                  <button key={n} onClick={() => { setName(n); setNameLocked(true); }} className="btn-secondary">
                     {n}
                   </button>
                 ))}
               </div>
             )}
             <div className="flex gap-2">
-              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="New name" maxLength={40} className="flex-1 bg-black/40 rounded p-2 outline-none border border-white/10 focus:border-clan-accent" />
-              <button disabled={!name.trim()} onClick={() => setNameLocked(true)} className="px-4 py-2 bg-clan-accent text-black font-bold rounded disabled:opacity-40">Use</button>
+              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="New name" maxLength={40} className="input" />
+              <button disabled={!name.trim()} onClick={() => setNameLocked(true)} className="btn-primary">Use</button>
             </div>
-            <p className="text-xs opacity-50">Anyone in this room can edit anyone&apos;s cards. Trust your clan.</p>
+            <p className="text-xs text-zinc-500">Anyone in this room can edit anyone&apos;s cards. Trust your clan.</p>
           </div>
         ) : (
           <div className="flex items-center justify-between">
             <span className="text-clan-accent font-semibold">{name}</span>
-            <button onClick={() => { setNameLocked(false); setCounts({}); }} className="text-xs opacity-60 underline">Switch</button>
+            <button onClick={() => { setNameLocked(false); setCounts({}); }} className="text-xs text-zinc-400 underline hover:text-zinc-100">Switch</button>
           </div>
         )}
       </section>
 
       {nameLocked && (
         <>
-          <p className="text-sm opacity-70 text-center">Tap a card to cycle: 0 → 1 → 2 → 3 → 4 → 5 → 0. Number = copies you own.</p>
+          <p className="text-sm text-zinc-400 text-center">Tap a card to cycle: 0 → 1 → 2 → 3 → 4 → 5 → 0. Number = copies you own.</p>
           {CLASSES.map((cls) => (
-            <section key={cls} className="space-y-2">
+            <section key={cls} className="space-y-2 animate-fade-up">
               <h3 className="text-lg font-semibold text-clan-accent">{cls}</h3>
               <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
-                {CARDS_BY_CLASS[cls].map((card) => {
+                {reorderForPicker(CARDS_BY_CLASS[cls], 8).map((card) => {
                   const cnt = counts[card.number] ?? 0;
                   return (
-                    <button key={card.number} onClick={() => cycle(card.number)} className={`card-tile ${cnt === 0 ? "missing" : ""} ${cnt >= 2 ? "dupe" : ""}`} title={card.name}>
+                    <button key={card.number} onClick={() => cycle(card.number)} className={`card-tile ${tierClass(card)} ${cnt === 0 ? "missing" : ""} ${cnt >= 2 ? "dupe" : ""}`} title={card.name}>
                       <img src={card.icon} alt={card.name} />
                       {cnt > 0 && <span className="badge">{cnt}</span>}
                       <span className="name">{card.name}</span>
@@ -124,13 +124,13 @@ export default function MePage() {
             </section>
           ))}
 
-          <div className="sticky bottom-4 bg-clan-card/95 backdrop-blur rounded-xl p-3 flex items-center justify-between gap-3 border border-clan-accent/40 shadow-lg">
-            <span className="text-sm opacity-70">Saving as <span className="text-clan-accent font-semibold">{name}</span></span>
-            <button disabled={saving} onClick={save} className="px-4 py-2 bg-clan-accent text-black font-bold rounded disabled:opacity-50">
+          <div className="sticky bottom-4 card p-3 flex items-center justify-between gap-3 border-clan-accent/40 shadow-lg backdrop-blur bg-clan-card/95">
+            <span className="text-sm text-zinc-400">Saving as <span className="text-clan-accent font-semibold">{name}</span></span>
+            <button disabled={saving} onClick={save} className="btn-primary">
               {saving ? "Saving…" : "Save"}
             </button>
           </div>
-          {err && <p className="text-red-400 text-center">{err}</p>}
+          {err && <p className="text-red-400 text-center text-sm">{err}</p>}
         </>
       )}
     </main>

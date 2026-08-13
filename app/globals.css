@@ -2,12 +2,45 @@
 @tailwind components;
 @tailwind utilities;
 
-html, body { background: #1a1410; color: #f4e9d4; }
-body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+html, body { background: #09090b; color: #fafafa; }
+body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
 
-.card-tile { @apply relative w-16 h-20 sm:w-20 sm:h-24 rounded-lg bg-clan-card border border-black/40 flex items-center justify-center overflow-hidden select-none; }
+.card-tile {
+  @apply relative w-16 h-20 sm:w-20 sm:h-24 rounded-lg bg-clan-surface border-2 border-zinc-800 flex items-center justify-center overflow-hidden select-none transition-transform;
+}
+.card-tile:hover { @apply -translate-y-0.5; }
 .card-tile img { @apply w-full h-full object-contain p-1 pointer-events-none; }
-.card-tile .badge { @apply absolute top-1 right-1 min-w-5 h-5 px-1 rounded bg-clan-accent text-black text-xs font-bold flex items-center justify-center; }
-.card-tile .name { @apply absolute bottom-0 inset-x-0 text-[10px] leading-tight text-center py-0.5 bg-black/60 truncate; }
+.card-tile .badge {
+  @apply absolute top-1 right-1 min-w-5 h-5 px-1 rounded bg-clan-accent text-black text-xs font-bold flex items-center justify-center;
+}
+.card-tile .name {
+  @apply absolute bottom-0 inset-x-0 text-[10px] leading-tight text-center py-0.5 bg-black/70 truncate;
+}
 .card-tile.missing { @apply opacity-40; }
 .card-tile.dupe { @apply ring-2 ring-clan-accent; }
+
+/* Tier borders — keyed by gemCost. */
+.card-tile.tier-50  { @apply border-tier-50; }
+.card-tile.tier-70  { @apply border-tier-70; }
+.card-tile.tier-90  { @apply border-tier-90; }
+.card-tile.tier-110 { @apply border-tier-110; }
+
+/* Reusable button primitives. */
+.btn-primary {
+  @apply inline-flex items-center justify-center gap-2 rounded-md px-4 py-2.5 bg-clan-accent text-black font-semibold transition hover:brightness-110 active:brightness-95 disabled:opacity-40 disabled:pointer-events-none;
+}
+.btn-secondary {
+  @apply inline-flex items-center justify-center gap-2 rounded-md px-4 py-2.5 bg-clan-surface text-zinc-100 border border-zinc-700 transition hover:bg-zinc-700 disabled:opacity-40 disabled:pointer-events-none;
+}
+.btn-ghost {
+  @apply inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-zinc-400 transition hover:bg-zinc-900 hover:text-zinc-100;
+}
+.btn-danger {
+  @apply inline-flex items-center justify-center gap-2 rounded-md px-4 py-2.5 bg-red-600 text-white font-semibold transition hover:bg-red-500 disabled:opacity-40 disabled:pointer-events-none;
+}
+.card {
+  @apply bg-clan-card border border-zinc-800 rounded-lg;
+}
+.input {
+  @apply w-full bg-zinc-950 rounded-md px-3 py-2.5 outline-none border border-zinc-700 focus:border-clan-accent focus:ring-1 focus:ring-clan-accent transition;
+}

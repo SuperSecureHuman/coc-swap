@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { deletePlayer, roomExists, upsertPlayer } from "@/lib/db";
+import { deletePlayer, getRoom, roomExists, upsertPlayer } from "@/lib/db";
+import { hashPin } from "@/lib/crypto";
 import type { PlayerCounts } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -35,10 +36,16 @@ export async function PUT(req: NextRequest, ctx: { params: Promise<{ code: strin
 export async function DELETE(req: NextRequest, ctx: { params: Promise<{ code: string }> }) {
   const { code } = await ctx.params;
   if (!hasRoomCookie(req, code)) return NextResponse.json({ error: "not joined" }, { status: 403 });
-  if (!(await roomExists(code))) return NextResponse.json({ error: "not found" }, { status: 404 });
+  const room = await getRoom(code);
+  if (!room) return NextResponse.json({ error: "not found" }, { status: 404 });
   const url = new URL(req.url);
   const name = url.searchParams.get("name");
   if (!name) return NextResponse.json({ error: "no name" }, { status: 400 });
+  const body = await req.json().catch(() => ({}));
+  const pin: string | undefined = body?.adminPin;
+  if (!pin || hashPin(room.salt, pin) !== room.adminPinHash) {
+    return NextResponse.json({ error: "bad pin" }, { status: 403 });
+  }
   await deletePlayer(code, name);
   return NextResponse.json({ ok: true });
 }
