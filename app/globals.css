@@ -1,0 +1,13 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body { background: #1a1410; color: #f4e9d4; }
+body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+
+.card-tile { @apply relative w-16 h-20 sm:w-20 sm:h-24 rounded-lg bg-clan-card border border-black/40 flex items-center justify-center overflow-hidden select-none; }
+.card-tile img { @apply w-full h-full object-contain p-1 pointer-events-none; }
+.card-tile .badge { @apply absolute top-1 right-1 min-w-5 h-5 px-1 rounded bg-clan-accent text-black text-xs font-bold flex items-center justify-center; }
+.card-tile .name { @apply absolute bottom-0 inset-x-0 text-[10px] leading-tight text-center py-0.5 bg-black/60 truncate; }
+.card-tile.missing { @apply opacity-40; }
+.card-tile.dupe { @apply ring-2 ring-clan-accent; }
