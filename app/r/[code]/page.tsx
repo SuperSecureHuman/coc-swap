@@ -48,9 +48,16 @@ export default function Room() {
 
   async function refresh() {
     try {
-      const r = await fetch(`/api/room/${code}`);
-      if (r.status === 403) { router.push("/"); return; }
+      let r = await fetch(`/api/room/${code}`);
+      if (r.status === 403) {
+        // No join cookie yet — mint one, then retry once.
+        const join = await fetch(`/api/room/${code}`, { method: "POST" });
+        if (join.status === 404) { setNotFound(true); return; }
+        if (!join.ok) { router.push("/"); return; }
+        r = await fetch(`/api/room/${code}`);
+      }
       if (r.status === 404) { setNotFound(true); return; }
+      if (!r.ok) { setSyncErr(true); return; }
       setRoom(await r.json());
       const t = await fetch(`/api/room/${code}/trades`);
       if (t.ok) setTrades(await t.json());

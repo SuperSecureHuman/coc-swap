@@ -36,8 +36,14 @@ export default function MePage() {
   useEffect(() => {
     let alive = true;
     (async () => {
-      const r = await fetch(`/api/room/${code}`);
-      if (r.status === 403) { router.push("/"); return; }
+      let r = await fetch(`/api/room/${code}`);
+      if (r.status === 403) {
+        // Deep link — no join cookie yet. Mint it, retry once.
+        const join = await fetch(`/api/room/${code}`, { method: "POST" });
+        if (!join.ok) { router.push("/"); return; }
+        r = await fetch(`/api/room/${code}`);
+      }
+      if (!r.ok) { router.push("/"); return; }
       const d = await r.json();
       if (alive) setRoom(d);
     })();
