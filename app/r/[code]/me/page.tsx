@@ -10,12 +10,23 @@ type RoomState = {
   players: Record<string, { name: string; counts: PlayerCounts; updatedAt: number }>;
 };
 
+const PIN_STORAGE_PREFIX = "coc-player-pin:"; // per (room, name)
+const NAME_RE = /^[A-Za-z0-9 _-]{1,20}$/;
+const PIN_RE = /^\d{4}$/;
+
+function pinKey(code: string, name: string) {
+  return `${PIN_STORAGE_PREFIX}${code}:${name}`;
+}
+
 export default function MePage() {
   const params = useParams<{ code: string }>();
   const code = params.code.toUpperCase();
   const router = useRouter();
   const [room, setRoom] = useState<RoomState | null>(null);
   const [name, setName] = useState<string>("");
+  const [pin, setPin] = useState<string>("");
+  const [pinConfirm, setPinConfirm] = useState<string>(""); // for first-claim flow only
+  const [isFirstClaim, setIsFirstClaim] = useState(false);
   const [nameLocked, setNameLocked] = useState(false);
   const [counts, setCounts] = useState<PlayerCounts>({});
   const [saving, setSaving] = useState(false);
@@ -38,6 +49,19 @@ export default function MePage() {
     if (existing) setCounts(existing.counts);
   }, [name, nameLocked, room]);
 
+  function selectName(chosen: string) {
+    if (!NAME_RE.test(chosen)) { setErr("Name: 1-20 chars, letters/digits/space/_/-"); return; }
+    setErr(null);
+    setName(chosen);
+    const isNew = !room?.players[chosen];
+    setIsFirstClaim(isNew);
+    const stashed = typeof window !== "undefined" ? localStorage.getItem(pinKey(code, chosen)) : null;
+    if (stashed && !isNew) setPin(stashed);
+    else setPin("");
+    setPinConfirm("");
+    setNameLocked(true);
+  }
+
   function cycle(num: number) {
     setCounts((c) => {
       const cur = c[num] ?? 0;
@@ -51,15 +75,28 @@ export default function MePage() {
 
   async function save() {
     if (!name.trim()) { setErr("pick a name"); return; }
+    if (!PIN_RE.test(pin)) { setErr("PIN must be 4 digits"); return; }
+    if (isFirstClaim && pin !== pinConfirm) { setErr("PINs don't match"); return; }
     setSaving(true); setErr(null);
     try {
+      const body: any = { name: name.trim(), counts };
+      if (isFirstClaim) body.setPin = pin;
+      else body.pin = pin;
       const r = await fetch(`/api/room/${code}/player`, {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), counts }),
+        body: JSON.stringify(body),
       });
       const d = await r.json();
+      if (r.status === 429) throw new Error(`Too many attempts. Try again in ${d.retryAfterSec ?? 60}s.`);
+      if (r.status === 409) {
+        // Name was claimed by someone else between our check and save. Switch to verify mode.
+        setIsFirstClaim(false);
+        throw new Error("Name just claimed by someone else — enter their PIN or pick a different name.");
+      }
       if (!r.ok) throw new Error(d.error || "failed");
+      // Stash PIN for this browser.
+      if (typeof window !== "undefined") localStorage.setItem(pinKey(code, name.trim()), pin);
       router.push(`/r/${code}`);
     } catch (e: any) { setErr(String(e.message || e)); }
     finally { setSaving(false); }
@@ -81,24 +118,64 @@ export default function MePage() {
         {!nameLocked ? (
           <div className="space-y-3">
             {existingNames.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {existingNames.map((n) => (
-                  <button key={n} onClick={() => { setName(n); setNameLocked(true); }} className="btn-secondary">
-                    {n}
-                  </button>
-                ))}
+              <div>
+                <p className="text-xs uppercase tracking-widest text-zinc-500 mb-2">Continue as</p>
+                <div className="flex flex-wrap gap-2">
+                  {existingNames.map((n) => (
+                    <button key={n} onClick={() => selectName(n)} className="btn-secondary">
+                      {n}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
-            <div className="flex gap-2">
-              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="New name" maxLength={40} className="input" />
-              <button disabled={!name.trim()} onClick={() => setNameLocked(true)} className="btn-primary">Use</button>
+            <div>
+              <p className="text-xs uppercase tracking-widest text-zinc-500 mb-2">Or new name</p>
+              <div className="flex gap-2">
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value.replace(/[^A-Za-z0-9 _-]/g, "").slice(0, 20))}
+                  placeholder="Name (letters/digits/space/_/-)"
+                  maxLength={20}
+                  className="input"
+                />
+                <button disabled={!name.trim() || !NAME_RE.test(name.trim())} onClick={() => selectName(name.trim())} className="btn-primary">Use</button>
+              </div>
             </div>
-            <p className="text-xs text-zinc-500">Anyone in this room can edit anyone&apos;s cards. Trust your clan.</p>
+            <p className="text-xs text-zinc-500">You&apos;ll set a 4-digit PIN on first save. Same PIN unlocks future edits from any device.</p>
           </div>
         ) : (
-          <div className="flex items-center justify-between">
-            <span className="text-clan-accent font-semibold">{name}</span>
-            <button onClick={() => { setNameLocked(false); setCounts({}); }} className="text-xs text-zinc-400 underline hover:text-zinc-100">Switch</button>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-clan-accent font-semibold">{name}</span>
+              <button onClick={() => { setNameLocked(false); setCounts({}); setPin(""); setPinConfirm(""); }} className="text-xs text-zinc-400 underline hover:text-zinc-100">Switch</button>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs uppercase tracking-widest text-zinc-500 block">
+                {isFirstClaim ? "Set a 4-digit PIN (save it, protects your slot)" : "Enter your PIN"}
+              </label>
+              <input
+                value={pin}
+                onChange={(e) => setPin(e.target.value.replace(/[^0-9]/g, "").slice(0, 4))}
+                placeholder="••••"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                className="input text-2xl font-mono tracking-widest text-center max-w-[10rem] mx-auto"
+              />
+              {isFirstClaim && (
+                <input
+                  value={pinConfirm}
+                  onChange={(e) => setPinConfirm(e.target.value.replace(/[^0-9]/g, "").slice(0, 4))}
+                  placeholder="Confirm PIN"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  className="input text-2xl font-mono tracking-widest text-center max-w-[10rem] mx-auto"
+                />
+              )}
+              {!isFirstClaim && (
+                <p className="text-xs text-zinc-500 text-center">Forgot your PIN? Ask the room admin to kick your slot so you can reclaim the name.</p>
+              )}
+            </div>
           </div>
         )}
       </section>
@@ -126,7 +203,7 @@ export default function MePage() {
 
           <div className="sticky bottom-4 card p-3 flex items-center justify-between gap-3 border-clan-accent/40 shadow-lg backdrop-blur bg-clan-card/95">
             <span className="text-sm text-zinc-400">Saving as <span className="text-clan-accent font-semibold">{name}</span></span>
-            <button disabled={saving} onClick={save} className="btn-primary">
+            <button disabled={saving || !PIN_RE.test(pin)} onClick={save} className="btn-primary">
               {saving ? "Saving…" : "Save"}
             </button>
           </div>

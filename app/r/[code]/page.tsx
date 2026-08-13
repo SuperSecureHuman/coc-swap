@@ -24,6 +24,7 @@ type Trades = {
 type Tab = "trades" | "members" | "catalog";
 
 const PIN_STORAGE_PREFIX = "coc-admin-pin:";
+const PLAYER_PIN_PREFIX = "coc-player-pin:";
 
 export default function Room() {
   const params = useParams<{ code: string }>();
@@ -35,6 +36,9 @@ export default function Room() {
   const [notFound, setNotFound] = useState(false);
   const [adminPin, setAdminPin] = useState<string | null>(null);
   const [adminModal, setAdminModal] = useState(false);
+  const [lastSync, setLastSync] = useState<number | null>(null);
+  const [syncErr, setSyncErr] = useState(false);
+  const [, setTick] = useState(0); // re-render for "12s ago" label
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -43,18 +47,25 @@ export default function Room() {
   }, [code]);
 
   async function refresh() {
-    const r = await fetch(`/api/room/${code}`);
-    if (r.status === 403) { router.push("/"); return; }
-    if (r.status === 404) { setNotFound(true); return; }
-    setRoom(await r.json());
-    const t = await fetch(`/api/room/${code}/trades`);
-    if (t.ok) setTrades(await t.json());
+    try {
+      const r = await fetch(`/api/room/${code}`);
+      if (r.status === 403) { router.push("/"); return; }
+      if (r.status === 404) { setNotFound(true); return; }
+      setRoom(await r.json());
+      const t = await fetch(`/api/room/${code}/trades`);
+      if (t.ok) setTrades(await t.json());
+      setLastSync(Date.now());
+      setSyncErr(false);
+    } catch {
+      setSyncErr(true);
+    }
   }
 
   useEffect(() => {
     refresh();
     const id = setInterval(refresh, 5000);
-    return () => clearInterval(id);
+    const tickId = setInterval(() => setTick((n) => n + 1), 1000);
+    return () => { clearInterval(id); clearInterval(tickId); };
   }, [code]);
 
   async function completeTrade(s: TradeSuggestion) {
@@ -76,11 +87,20 @@ export default function Room() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ adminPin }),
     });
+    if (r.status === 429) {
+      const d = await r.json().catch(() => ({}));
+      alert(`Too many attempts. Try again in ${d.retryAfterSec ?? 60}s.`);
+      return;
+    }
     if (r.status === 403) {
       sessionStorage.removeItem(PIN_STORAGE_PREFIX + code);
       setAdminPin(null);
       alert("PIN rejected");
       return;
+    }
+    if (r.ok && typeof window !== "undefined") {
+      // Kicked player's PIN cache in *this* browser is now stale.
+      localStorage.removeItem(PLAYER_PIN_PREFIX + code + ":" + name);
     }
     await refresh();
   }
@@ -93,6 +113,11 @@ export default function Room() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ adminPin }),
     });
+    if (r.status === 429) {
+      const d = await r.json().catch(() => ({}));
+      alert(`Too many attempts. Try again in ${d.retryAfterSec ?? 60}s.`);
+      return;
+    }
     if (r.status === 403) {
       sessionStorage.removeItem(PIN_STORAGE_PREFIX + code);
       setAdminPin(null);
@@ -131,6 +156,8 @@ export default function Room() {
           <div className="font-mono text-xl text-clan-accent font-bold tracking-widest">{code}</div>
         </div>
       </header>
+
+      <SyncPill lastSync={lastSync} error={syncErr} />
 
       <div className="flex items-center gap-2">
         <button onClick={() => router.push(`/r/${code}/me`)} className="btn-primary flex-1 py-3">
@@ -376,4 +403,18 @@ function relTime(ts: number) {
   if (s < 3600) return `${Math.floor(s / 60)}m ago`;
   if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
   return `${Math.floor(s / 86400)}d ago`;
+}
+
+function SyncPill({ lastSync, error }: { lastSync: number | null; error: boolean }) {
+  if (lastSync === null && !error) return null;
+  const age = lastSync ? Math.floor((Date.now() - lastSync) / 1000) : Infinity;
+  const stale = error || age > 30;
+  return (
+    <div className="flex justify-center">
+      <div className={`inline-flex items-center gap-2 px-2 py-1 rounded-full text-[11px] ${stale ? "bg-red-950 text-red-300 border border-red-900" : "bg-zinc-900 text-zinc-500 border border-zinc-800"}`}>
+        <span className={`inline-block w-1.5 h-1.5 rounded-full ${stale ? "bg-red-400" : "bg-green-500"}`} />
+        {error ? "offline" : lastSync ? `synced ${age}s ago` : "connecting…"}
+      </div>
+    </div>
+  );
 }

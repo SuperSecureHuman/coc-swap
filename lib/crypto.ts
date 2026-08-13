@@ -20,3 +20,14 @@ export function sha256(s: string): string {
 export function hashPin(salt: string, pin: string): string {
   return sha256(`${salt}:${pin}`);
 }
+
+// Client-facing name rules. Server enforces this; UI mirrors it.
+// Letters, digits, space, underscore, hyphen. 1-20 chars.
+export const NAME_REGEX = /^[A-Za-z0-9 _-]{1,20}$/;
+export function isValidName(s: string): boolean {
+  return typeof s === "string" && NAME_REGEX.test(s.trim()) && s.trim().length === s.length;
+}
+export const PIN_REGEX = /^\d{4}$/;
+export function isValidPin(s: string): boolean {
+  return typeof s === "string" && PIN_REGEX.test(s);
+}
