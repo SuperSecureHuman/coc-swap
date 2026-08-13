@@ -57,6 +57,17 @@ export default function Room() {
 
   const memberNames = Object.keys(room.players);
 
+  async function completeTrade(s: TradeSuggestion) {
+    const body: Record<string, unknown> = { from: s.from, to: s.to, cardNumber: s.cardNumber };
+    if (s.reciprocal) body.reciprocalCardNumber = s.reciprocal.cardNumber;
+    await fetch(`/api/room/${code}/trade`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    await refresh();
+  }
+
   return (
     <main className="space-y-4">
       <header className="flex items-center justify-between">
@@ -82,14 +93,14 @@ export default function Room() {
         ))}
       </nav>
 
-      {tab === "trades" && <TradesTab trades={trades} memberCount={memberNames.length} />}
+      {tab === "trades" && <TradesTab trades={trades} memberCount={memberNames.length} onDone={completeTrade} />}
       {tab === "members" && <MembersTab room={room} trades={trades} />}
       {tab === "catalog" && <CatalogTab />}
     </main>
   );
 }
 
-function TradesTab({ trades, memberCount }: { trades: Trades | null; memberCount: number }) {
+function TradesTab({ trades, memberCount, onDone }: { trades: Trades | null; memberCount: number; onDone: (s: TradeSuggestion) => void | Promise<void> }) {
   if (memberCount === 0) return <p className="opacity-60 py-6 text-center">No one has filled cards yet. Be the first — tap &quot;Edit my cards&quot;.</p>;
   if (!trades) return <p className="opacity-60 py-6 text-center">Computing…</p>;
   const total = trades.reciprocal.length + trades.oneSided.length;
@@ -130,6 +141,7 @@ function TradesTab({ trades, memberCount }: { trades: Trades | null; memberCount
                   <div><span className="font-semibold">{s.from}</span> ← <span className="font-semibold text-clan-accent">{s.to}</span></div>
                 </div>
                 <TradeCard num={s.reciprocal!.cardNumber} name={s.reciprocal!.cardName} />
+                <DoneButton onClick={() => onDone(s)} />
               </div>
             ))}
           </div>
@@ -148,6 +160,7 @@ function TradesTab({ trades, memberCount }: { trades: Trades | null; memberCount
                   <div><span className="font-semibold">{s.to}</span> needs → ask <span className="font-semibold text-clan-accent">{s.from}</span></div>
                   <div className="opacity-60 text-xs">{s.class}</div>
                 </div>
+                <DoneButton onClick={() => onDone(s)} />
               </div>
             ))}
           </div>
@@ -164,6 +177,24 @@ function TradeCard({ num, name }: { num: number; name: string }) {
     <div className="card-tile w-14 h-16 flex-shrink-0">
       <img src={c.icon} alt={name} />
     </div>
+  );
+}
+
+function DoneButton({ onClick }: { onClick: () => void | Promise<void> }) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <button
+      onClick={async () => {
+        if (busy) return;
+        setBusy(true);
+        try { await onClick(); } finally { setBusy(false); }
+      }}
+      disabled={busy}
+      className="px-3 py-2 rounded bg-clan-accent text-black text-xs font-bold flex-shrink-0 disabled:opacity-40"
+      title="Mark this trade as completed"
+    >
+      {busy ? "…" : "Done ✓"}
+    </button>
   );
 }
 

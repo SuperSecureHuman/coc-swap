@@ -85,3 +85,46 @@ export async function roomExists(code: string): Promise<boolean> {
   const rows = await sql`SELECT 1 FROM rooms WHERE code = ${code.toUpperCase()} LIMIT 1` as any[];
   return rows.length > 0;
 }
+
+// Apply a trade: decrement `from`'s count of `cardNum` by 1, increment `to`'s count by 1.
+// Refuses if `from` does not have >= 2 of the card (dupe rule). Runs atomically.
+// Returns true if applied, false otherwise (stale/invalid).
+export async function applyTradeLeg(
+  code: string,
+  from: string,
+  to: string,
+  cardNum: number,
+): Promise<boolean> {
+  const roomCode = code.toUpperCase();
+  const key = String(cardNum);
+  // Guard: `from` must have >= 2 of this card. Use CTE + conditional update.
+  const rows = await sql`
+    WITH src AS (
+      SELECT COALESCE((counts->>${key})::int, 0) AS cnt
+      FROM players WHERE room_code = ${roomCode} AND name = ${from}
+    )
+    UPDATE players SET
+      counts = jsonb_set(
+        counts,
+        ARRAY[${key}]::text[],
+        to_jsonb(GREATEST(COALESCE((counts->>${key})::int, 0) - 1, 0))
+      ),
+      updated_at = NOW()
+    WHERE room_code = ${roomCode} AND name = ${from}
+      AND (SELECT cnt FROM src) >= 2
+    RETURNING 1
+  ` as any[];
+  if (rows.length === 0) return false;
+
+  await sql`
+    UPDATE players SET
+      counts = jsonb_set(
+        counts,
+        ARRAY[${key}]::text[],
+        to_jsonb(COALESCE((counts->>${key})::int, 0) + 1)
+      ),
+      updated_at = NOW()
+    WHERE room_code = ${roomCode} AND name = ${to}
+  `;
+  return true;
+}
