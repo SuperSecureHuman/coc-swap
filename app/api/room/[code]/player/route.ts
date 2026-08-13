@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getRoom, putRoom } from "@/lib/kv";
+import { deletePlayer, roomExists, upsertPlayer } from "@/lib/db";
 import type { PlayerCounts } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -8,12 +8,10 @@ function hasRoomCookie(req: NextRequest, code: string) {
   return req.cookies.get("room:" + code.toUpperCase())?.value === "1";
 }
 
-// PUT /api/room/[code]/player  body: { name: string, counts: {number: number} }
 export async function PUT(req: NextRequest, ctx: { params: Promise<{ code: string }> }) {
   const { code } = await ctx.params;
   if (!hasRoomCookie(req, code)) return NextResponse.json({ error: "not joined" }, { status: 403 });
-  const room = await getRoom(code);
-  if (!room) return NextResponse.json({ error: "not found" }, { status: 404 });
+  if (!(await roomExists(code))) return NextResponse.json({ error: "not found" }, { status: 404 });
 
   const body = await req.json().catch(() => null);
   const name: string | undefined = body?.name?.trim();
@@ -30,21 +28,17 @@ export async function PUT(req: NextRequest, ctx: { params: Promise<{ code: strin
     if (cnt > 0) counts[num] = Math.floor(cnt);
   }
 
-  room.players[name] = { name, counts, updatedAt: Date.now() };
-  await putRoom(room);
+  await upsertPlayer(code, name, counts);
   return NextResponse.json({ ok: true });
 }
 
-// DELETE /api/room/[code]/player?name=X — remove yourself (or admin kick w/ pin)
 export async function DELETE(req: NextRequest, ctx: { params: Promise<{ code: string }> }) {
   const { code } = await ctx.params;
   if (!hasRoomCookie(req, code)) return NextResponse.json({ error: "not joined" }, { status: 403 });
-  const room = await getRoom(code);
-  if (!room) return NextResponse.json({ error: "not found" }, { status: 404 });
+  if (!(await roomExists(code))) return NextResponse.json({ error: "not found" }, { status: 404 });
   const url = new URL(req.url);
   const name = url.searchParams.get("name");
   if (!name) return NextResponse.json({ error: "no name" }, { status: 400 });
-  delete room.players[name];
-  await putRoom(room);
+  await deletePlayer(code, name);
   return NextResponse.json({ ok: true });
 }
